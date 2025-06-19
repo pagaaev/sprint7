@@ -1,53 +1,24 @@
 package com.example;
 
+import com.example.api.CourierApi;
+import com.example.model.Courier;
 import io.qameta.allure.Description;
-import io.qameta.allure.Step;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.*;
 
 public class CourierCreationTest {
 
-    private String baseUrl = "https://qa-scooter.praktikum-services.ru/api/v1";
+    private final CourierApi courierApi = new CourierApi();
     private Integer courierId = null;
 
     @Before
     public void setUp() {
-        RestAssured.baseURI = baseUrl;
-    }
-
-    @Step("Создание курьера с логином {login}")
-    private void createCourier(String login, String password) {
-        String courier = String.format(
-            "{ \"login\": \"%s\", \"password\": \"%s\", \"firstName\": \"Test\" }",
-            login, password);
-
-        given()
-            .contentType("application/json")
-            .body(courier)
-            .when()
-            .post("/courier")
-            .then()
-            .statusCode(201)
-            .body("ok", equalTo(true));
-    }
-
-    @Step("Получение ID курьера")
-    private Integer getCourierId(String login, String password) {
-        return given()
-            .contentType("application/json")
-            .body(String.format("{\"login\": \"%s\", \"password\": \"%s\"}", login, password))
-            .when()
-            .post("/courier/login")
-            .then()
-            .statusCode(200)
-            .extract()
-            .path("id");
+        RestAssured.baseURI = "https://qa-scooter.praktikum-services.ru/api/v1";
     }
 
     @Test
@@ -56,8 +27,13 @@ public class CourierCreationTest {
         String login = "testuser" + System.currentTimeMillis();
         String password = "password123";
 
-        createCourier(login, password);
-        courierId = getCourierId(login, password);
+        courierApi.createCourier(login, password, "Test")
+                .then().statusCode(201)
+                .body("ok", equalTo(true));
+
+        Response loginResponse = courierApi.loginCourier(login, password);
+        loginResponse.then().statusCode(200);
+        courierId = loginResponse.path("id");
     }
 
     @Test
@@ -66,58 +42,44 @@ public class CourierCreationTest {
         String login = "duplicateUser" + System.currentTimeMillis();
         String password = "password123";
 
-        createCourier(login, password);
-        courierId = getCourierId(login, password);
+        courierApi.createCourier(login, password, "Test")
+                .then().statusCode(201);
 
-        given()
-            .contentType("application/json")
-            .body(String.format(
-                "{ \"login\": \"%s\", \"password\": \"%s\", \"firstName\": \"Test\" }",
-                login, password))
-            .when()
-            .post("/courier")
-            .then()
-            .statusCode(409)
-            .body("message", containsString("уже"));
+        courierId = courierApi.loginCourier(login, password)
+                .then().statusCode(200)
+                .extract().path("id");
+
+        courierApi.createCourier(login, password, "Test")
+                .then().statusCode(409)
+                .body("message", containsString("уже"));
     }
 
     @Test
     @Description("Создание курьера без логина")
     public void createCourierWithoutLogin() {
-        given()
-            .contentType("application/json")
-            .body("{ \"password\": \"pass\", \"firstName\": \"Name\" }")
-            .when()
-            .post("/courier")
-            .then()
-            .statusCode(400);
+        Courier courier = new Courier(null, "pass", "Name");
+
+        courierApi.createCourier(courier)
+                .then()
+                .statusCode(400);
     }
 
     @Test
     @Description("Создание курьера без пароля")
     public void createCourierWithoutPassword() {
-        given()
-            .contentType("application/json")
-            .body("{ \"login\": \"login\", \"firstName\": \"Name\" }")
-            .when()
-            .post("/courier")
-            .then()
-            .statusCode(400);
+        Courier courier = new Courier("login", null, "Name");
+
+        courierApi.createCourier(courier)
+                .then()
+                .statusCode(400);
     }
 
     @After
     public void tearDown() {
         if (courierId != null) {
-            try {
-                given()
-                    .contentType("application/json")
-                    .when()
-                    .delete("/courier/" + courierId)
+            courierApi.deleteCourier(courierId)
                     .then()
                     .statusCode(200);
-            } catch (Exception e) {
-                System.err.println("Failed to delete courier: " + e.getMessage());
-            }
         }
     }
 }
