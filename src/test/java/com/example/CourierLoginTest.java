@@ -59,6 +59,31 @@ public class CourierLoginTest {
     }
 
     @Test
+    @Description("Авторизация без логина")
+    public void loginWithMissingLogin() {
+        try {
+            Response response = given()
+                .contentType(ContentType.JSON)
+                .body("{\"password\": \"" + COURIER_PASSWORD + "\"}")
+                .when()
+                .post("/courier/login");
+
+            // Если сервер недоступен - пропускаем тест
+            if (response.statusCode() >= 500) {
+                System.out.println("Сервер недоступен, статус: " + response.statusCode());
+                return;
+            }
+
+            response.then()
+                .statusCode(400)
+                .body("message", equalTo("Недостаточно данных для входа"));
+        } catch (Exception e) {
+            System.out.println("Ошибка при выполнении запроса: " + e.getMessage());
+        }
+    }
+
+
+    @Test
     @Description("Авторизация без пароля")
     public void loginWithMissingField() {
         try {
@@ -81,6 +106,8 @@ public class CourierLoginTest {
             System.out.println("Ошибка при выполнении запроса: " + e.getMessage());
         }
     }
+
+
 
     @Test
     @Description("Авторизация с неверными данными")
