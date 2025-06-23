@@ -1,14 +1,14 @@
 package com.example;
 
+import com.example.api.CourierApi;
+import com.example.model.Courier;
+import com.example.model.CourierCredentials;
 import io.qameta.allure.Description;
-import io.restassured.RestAssured;
-import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.*;
 
 public class CourierLoginTest {
@@ -18,19 +18,12 @@ public class CourierLoginTest {
     private static final String COURIER_FIRSTNAME = "Иван";
     private static Integer courierId;
 
+    private static final CourierApi courierApi = new CourierApi();
+
     @BeforeClass
     public static void setup() {
-        RestAssured.baseURI = "https://qa-scooter.praktikum-services.ru/api/v1";
-
-        String courierPayload = String.format(
-            "{\"login\": \"%s\", \"password\": \"%s\", \"firstName\": \"%s\"}",
-            COURIER_LOGIN, COURIER_PASSWORD, COURIER_FIRSTNAME);
-
-        Response response = given()
-            .contentType(ContentType.JSON)
-            .body(courierPayload)
-            .when()
-            .post("/courier");
+        Courier courier = new Courier(COURIER_LOGIN, COURIER_PASSWORD, COURIER_FIRSTNAME);
+        Response response = courierApi.createCourier(courier);
 
         if (response.statusCode() == 201) {
             System.out.println("Курьер успешно создан");
@@ -42,81 +35,51 @@ public class CourierLoginTest {
     @Test
     @Description("Успешная авторизация курьера")
     public void loginWithValidCredentials() {
-        String payload = String.format(
-            "{\"login\": \"%s\", \"password\": \"%s\"}",
-            COURIER_LOGIN, COURIER_PASSWORD);
+        Response response = courierApi.loginCourier(COURIER_LOGIN, COURIER_PASSWORD);
 
-        courierId = given()
-            .contentType(ContentType.JSON)
-            .body(payload)
-            .when()
-            .post("/courier/login")
-            .then()
+        courierId = response.then()
             .statusCode(200)
             .body("id", notNullValue())
-            .extract()
-            .path("id");
+            .extract().path("id");
     }
 
     @Test
     @Description("Авторизация без логина")
     public void loginWithMissingLogin() {
-        try {
-            Response response = given()
-                .contentType(ContentType.JSON)
-                .body("{\"password\": \"" + COURIER_PASSWORD + "\"}")
-                .when()
-                .post("/courier/login");
+        CourierCredentials creds = new CourierCredentials(null, COURIER_PASSWORD);
+        Response response = courierApi.loginCourier(creds);
 
-            // Если сервер недоступен - пропускаем тест
-            if (response.statusCode() >= 500) {
-                System.out.println("Сервер недоступен, статус: " + response.statusCode());
-                return;
-            }
-
-            response.then()
-                .statusCode(400)
-                .body("message", equalTo("Недостаточно данных для входа"));
-        } catch (Exception e) {
-            System.out.println("Ошибка при выполнении запроса: " + e.getMessage());
+        if (response.statusCode() >= 500) {
+            System.out.println("Сервер недоступен, статус: " + response.statusCode());
+            return;
         }
-    }
 
+        response.then()
+            .statusCode(400)
+            .body("message", equalTo("Недостаточно данных для входа"));
+    }
 
     @Test
     @Description("Авторизация без пароля")
-    public void loginWithMissingField() {
-        try {
-            Response response = given()
-                .contentType(ContentType.JSON)
-                .body("{\"login\": \"" + COURIER_LOGIN + "\"}")
-                .when()
-                .post("/courier/login");
+    public void loginWithMissingPassword() {
+        CourierCredentials creds = new CourierCredentials(COURIER_LOGIN, null);
+        Response response = courierApi.loginCourier(creds);
 
-            // Если сервер недоступен - пропускаем тест
-            if (response.statusCode() >= 500) {
-                System.out.println("Сервер недоступен, статус: " + response.statusCode());
-                return;
-            }
-
-            response.then()
-                .statusCode(400)
-                .body("message", equalTo("Недостаточно данных для входа"));
-        } catch (Exception e) {
-            System.out.println("Ошибка при выполнении запроса: " + e.getMessage());
+        if (response.statusCode() >= 500) {
+            System.out.println("Сервер недоступен, статус: " + response.statusCode());
+            return;
         }
+
+        response.then()
+            .statusCode(400)
+            .body("message", equalTo("Недостаточно данных для входа"));
     }
-
-
 
     @Test
     @Description("Авторизация с неверными данными")
     public void loginWithInvalidCredentials() {
-        given()
-            .contentType(ContentType.JSON)
-            .body("{\"login\": \"invalid\", \"password\": \"wrong\"}")
-            .when()
-            .post("/courier/login")
+        CourierCredentials creds = new CourierCredentials("invalid", "wrong");
+        courierApi.loginCourier(creds)
             .then()
             .statusCode(404)
             .body("message", equalTo("Учетная запись не найдена"));
@@ -125,10 +88,7 @@ public class CourierLoginTest {
     @AfterClass
     public static void cleanup() {
         if (courierId != null) {
-            given()
-                .contentType(ContentType.JSON)
-                .when()
-                .delete("/courier/" + courierId)
+            courierApi.deleteCourier(courierId)
                 .then()
                 .statusCode(200);
         }
