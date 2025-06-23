@@ -35,19 +35,21 @@ public class CourierLoginTest {
     @Test
     @Description("Успешная авторизация курьера")
     public void loginWithValidCredentials() {
-        Response response = courierApi.loginCourier(COURIER_LOGIN, COURIER_PASSWORD);
+        CourierCredentials credentials = new CourierCredentials(COURIER_LOGIN, COURIER_PASSWORD);
+        Response response = courierApi.loginCourier(credentials);
 
         courierId = response.then()
-            .statusCode(200)
-            .body("id", notNullValue())
-            .extract().path("id");
+                .statusCode(200)
+                .body("id", notNullValue())
+                .extract()
+                .path("id");
     }
 
     @Test
     @Description("Авторизация без логина")
     public void loginWithMissingLogin() {
-        CourierCredentials creds = new CourierCredentials(null, COURIER_PASSWORD);
-        Response response = courierApi.loginCourier(creds);
+        CourierCredentials credentials = new CourierCredentials(null, COURIER_PASSWORD);
+        Response response = courierApi.loginCourier(credentials);
 
         if (response.statusCode() >= 500) {
             System.out.println("Сервер недоступен, статус: " + response.statusCode());
@@ -55,15 +57,15 @@ public class CourierLoginTest {
         }
 
         response.then()
-            .statusCode(400)
-            .body("message", equalTo("Недостаточно данных для входа"));
+                .statusCode(400)
+                .body("message", equalTo("Недостаточно данных для входа"));
     }
 
     @Test
     @Description("Авторизация без пароля")
     public void loginWithMissingPassword() {
-        CourierCredentials creds = new CourierCredentials(COURIER_LOGIN, null);
-        Response response = courierApi.loginCourier(creds);
+        CourierCredentials credentials = new CourierCredentials(COURIER_LOGIN, null);
+        Response response = courierApi.loginCourier(credentials);
 
         if (response.statusCode() >= 500) {
             System.out.println("Сервер недоступен, статус: " + response.statusCode());
@@ -71,26 +73,26 @@ public class CourierLoginTest {
         }
 
         response.then()
-            .statusCode(400)
-            .body("message", equalTo("Недостаточно данных для входа"));
+                .statusCode(400)
+                .body("message", equalTo("Недостаточно данных для входа"));
     }
 
     @Test
     @Description("Авторизация с неверными данными")
     public void loginWithInvalidCredentials() {
-        CourierCredentials creds = new CourierCredentials("invalid", "wrong");
-        courierApi.loginCourier(creds)
-            .then()
-            .statusCode(404)
-            .body("message", equalTo("Учетная запись не найдена"));
+        CourierCredentials credentials = new CourierCredentials("invalid", "wrong");
+        courierApi.loginCourier(credentials)
+                .then()
+                .statusCode(404)
+                .body("message", equalTo("Учетная запись не найдена"));
     }
 
     @AfterClass
     public static void cleanup() {
         if (courierId != null) {
             courierApi.deleteCourier(courierId)
-                .then()
-                .statusCode(200);
+                    .then()
+                    .statusCode(200);
         }
     }
 }
