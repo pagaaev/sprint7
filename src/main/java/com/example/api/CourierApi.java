@@ -1,6 +1,7 @@
 package com.example.api;
 
 import com.example.model.Courier;
+import com.example.model.CourierCredentials;
 import io.qameta.allure.Step;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
@@ -19,16 +20,17 @@ public class CourierApi {
     public Response createCourier(Courier courier) {
         return given()
                 .contentType("application/json")
-                .body(courier)
+                .body(courier)  // сериализация объекта Courier
                 .when()
                 .post("/courier");
     }
 
     @Step("Логин курьера")
     public Response loginCourier(String login, String password) {
+        CourierCredentials credentials = new CourierCredentials(login, password);
         return given()
                 .contentType("application/json")
-                .body("{\"login\": \"" + login + "\", \"password\": \"" + password + "\"}")
+                .body(credentials)  // сериализация объекта CourierCredentials
                 .when()
                 .post("/courier/login");
     }
